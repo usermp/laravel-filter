@@ -1,0 +1,22 @@
+{
+    "name": "usermp/laravel-filter",
+    "description": "test test",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Usermp\\LaravelFilter\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "mohammad",
+            "email": "usermp76@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": "^8.1",
+        "laravel/framework": "^10.0",
+        "sentry/sentry-laravel": "*"
+    }
+}
