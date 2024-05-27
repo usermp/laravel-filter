@@ -12,11 +12,15 @@ trait Filterable
     {
         $filters = Request::all();
         foreach ($filters as $filter => $value) {
-        	$value = urldecode($value);
+        	
             if (in_array($filter, $this->filterable ?? [])) {
                 if (is_array($value)) {
+                    $value = array_filter($value,function($item){
+                        return urldecode($item);
+                    });
                     $query->whereIn($filter, 'like' , '%'.$value.'%');
                 }else {
+                    $value = urldecode($value);
                     $query->where($filter, 'like', "%$value%");
                 }
             }
