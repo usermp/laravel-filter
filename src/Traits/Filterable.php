@@ -16,9 +16,12 @@ trait Filterable
     {
         $filters = Request::all();
         $filterable = $this->getFilterableAttributes($filters);
+        $relations = $this->getFilterableRelations();
 
         foreach ($filters as $filter => $value) {
-            if (in_array($filter, $filterable)) {
+            if ($this->isRelationFilter($filter, $relations)) {
+                $this->applyRelationFilter($query, $filter, $value);
+            } elseif (in_array($filter, $filterable)) {
                 $this->applyFilter($query, $filter, $value);
             }
         }
@@ -38,6 +41,28 @@ trait Filterable
     }
 
     /**
+     * Get the filterable relations.
+     *
+     * @return array
+     */
+    protected function getFilterableRelations(): array
+    {
+        return property_exists($this, 'filterableRelations') ? $this->filterableRelations : [];
+    }
+
+    /**
+     * Check if the filter is for a relation.
+     *
+     * @param string $filter
+     * @param array $relations
+     * @return bool
+     */
+    protected function isRelationFilter(string $filter, array $relations): bool
+    {
+        return strpos($filter, '.') !== false && in_array(explode('.', $filter)[0], $relations);
+    }
+
+    /**
      * Apply a single filter to the query.
      *
      * @param Builder $query
@@ -52,5 +77,26 @@ trait Filterable
         } else {
             $query->where($filter, 'like', '%' . urldecode($value) . '%');
         }
+    }
+
+    /**
+     * Apply a filter to a related model query.
+     *
+     * @param Builder $query
+     * @param string $filter
+     * @param mixed $value
+     * @return void
+     */
+    protected function applyRelationFilter(Builder $query, string $filter, $value): void
+    {
+        [$relation, $relationFilter] = explode('.', $filter, 2);
+
+        $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+            if (is_array($value)) {
+                $relationQuery->whereIn($relationFilter, $value);
+            } else {
+                $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
+            }
+        });
     }
 }
