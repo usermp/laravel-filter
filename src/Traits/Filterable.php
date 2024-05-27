@@ -14,11 +14,10 @@ trait Filterable
      */
     public function scopeFilter(Builder $query): Builder
     {
-        $filters = Request::all();
+        $filters = $this->processFilters(Request::all());
         $filterable = $this->getFilterableAttributes($filters);
         $relations = $this->getFilterableRelations();
 
-        
         foreach ($filters as $filter => $value) {
             if ($this->isRelationFilter($filter, $relations)) {
                 $this->applyRelationFilter($query, $filter, $value);
@@ -28,6 +27,22 @@ trait Filterable
         }
 
         return $query;
+    }
+
+    /**
+     * Process filters by replacing underscores with dots in the keys.
+     *
+     * @param array $filters
+     * @return array
+     */
+    protected function processFilters(array $filters): array
+    {
+        $processedFilters = [];
+        foreach ($filters as $key => $value) {
+            $processedKey = str_replace('_', '.', $key);
+            $processedFilters[$processedKey] = $value;
+        }
+        return $processedFilters;
     }
 
     /**
