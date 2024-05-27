@@ -18,6 +18,7 @@ trait Filterable
         $filterable = $this->getFilterableAttributes($filters);
         $relations = $this->getFilterableRelations();
 
+        
         foreach ($filters as $filter => $value) {
             if ($this->isRelationFilter($filter, $relations)) {
                 $this->applyRelationFilter($query, $filter, $value);
