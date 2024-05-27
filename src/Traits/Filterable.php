@@ -11,11 +11,11 @@ trait Filterable
     public function scopeFilter(Builder $query)
     {
         $filters = Request::all();
-
         foreach ($filters as $filter => $value) {
+        	$value = urldecode($value);
             if (in_array($filter, $this->filterable ?? [])) {
                 if (is_array($value)) {
-                    $query->whereIn($filter, $value);
+                    $query->whereIn($filter, 'like' , '%'.$value.'%');
                 }else {
                     $query->where($filter, 'like', "%$value%");
                 }
