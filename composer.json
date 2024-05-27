@@ -1,6 +1,7 @@
 {
     "name": "usermp/laravel-filter",
-    "description": "test test",
+    "description": "A Laravel package for filterable traits",
+    "type": "library",
     "license": "MIT",
     "autoload": {
         "psr-4": {
@@ -15,8 +16,7 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "php": "^8.1",
-        "laravel/framework": "^10.0",
-        "sentry/sentry-laravel": "*"
+        "php": "^8.0|^8.1|^8.2|^8.3",
+        "illuminate/support": "^8.0|^9.0|^10.0"
     }
 }
