@@ -106,12 +106,18 @@ trait Filterable
     {
         [$relation, $relationFilter] = explode('.', $filter, 2);
 
-        $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
-            if (is_array($value)) {
-                $relationQuery->whereIn($relationFilter, $value);
-            } else {
+        if (is_array($value)) {
+            $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+                $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
+            })->with([$relation => function ($query) use ($relationFilter, $value) {
+                $query->whereIn($relationFilter, array_map('urldecode', $value));
+            }]);
+        } else {
+            $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
                 $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
-            }
-        });
+            })->with([$relation => function ($query) use ($relationFilter, $value) {
+                $query->where($relationFilter, 'like', '%' . urldecode($value) . '%');
+            }]);
+        }
     }
 }
