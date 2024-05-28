@@ -88,7 +88,11 @@ trait Filterable
     protected function applyFilter(Builder $query, string $filter, $value): void
     {
         if (is_array($value)) {
-            $query->whereIn($filter, $value);
+            $query->where(function ($query) use ($filter, $value) {
+                foreach ($value as $v) {
+                    $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
+                }
+            });
         } else {
             $query->where($filter, 'like', '%' . urldecode($value) . '%');
         }
