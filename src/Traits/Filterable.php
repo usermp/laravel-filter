@@ -62,7 +62,7 @@ trait Filterable
      */
     protected function getFilterableRelations(): array
     {
-        return property_exists($this, 'filterableRelations') ? $this->filterableRelations : [];
+        return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_keys(Request::all());
     }
 
     /**
