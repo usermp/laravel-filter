@@ -63,7 +63,7 @@ trait Filterable
     protected function getFilterableRelations(): array
     {
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
-            $explode = explode(".",$filter);
+            $explode = explode("_",$filter);
             return $explode[0];
         },array_keys(Request::all()));
     }
