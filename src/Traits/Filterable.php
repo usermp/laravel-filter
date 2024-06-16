@@ -52,7 +52,7 @@ trait Filterable
      */
     protected function getFilterableAttributes(): array
     {
-        return property_exists($this, 'filterable') ? $this->filterable : [];
+        return property_exists($this, 'filterable') ? $this->filterable : array_keys(Request::all());
     }
 
     /**
@@ -89,8 +89,12 @@ trait Filterable
     {
         if (is_array($value)) {
             $query->where(function ($query) use ($filter, $value) {
-                foreach ($value as $v) {
-                    $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
+                foreach ($value as $key => $v) {
+                    if($key == "equal"){
+                        $query->where($filter,  urldecode($v));
+                    }else{
+                        $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
+                    }
                 }
             });
         } else {
