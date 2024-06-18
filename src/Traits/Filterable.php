@@ -14,7 +14,7 @@ trait Filterable
      */
     public function scopeFilter(Builder $query): Builder
     {
-        $filters = $this->processFilters(Request::all());
+        $filters = $this->processFilters($this->withoutFilter(Request::all()));
         $filterable = $this->getFilterableAttributes();
         $relations = $this->getFilterableRelations();
 
@@ -52,7 +52,7 @@ trait Filterable
      */
     protected function getFilterableAttributes(): array
     {
-        return property_exists($this, 'filterable') ? $this->filterable : array_keys(Request::all());
+        return property_exists($this, 'filterable') ? $this->filterable : array_keys($this->withoutFilter(Request::all()));
     }
 
     /**
@@ -65,7 +65,7 @@ trait Filterable
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
             $explode = explode("_",$filter);
             return $explode[0];
-        },array_keys(Request::all()));
+        },array_keys($this->withoutFilter(Request::all())));
     }
 
     /**
@@ -131,4 +131,10 @@ trait Filterable
             }]);
         }
     }
+    private function withoutFilter($filters)
+    {
+        unset($filters['page']);
+        return $filters;
+    }
 }
+
