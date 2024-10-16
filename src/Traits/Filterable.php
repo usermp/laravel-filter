@@ -64,7 +64,10 @@ trait Filterable
     {
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
             $explode = explode("_",$filter);
-            return $explode[0];
+
+            if($explode[1] == "id") return $explode[0];
+
+            return $filter;
         },array_keys($this->withoutFilter(Request::all())));
     }
 
