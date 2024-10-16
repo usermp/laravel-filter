@@ -30,7 +30,7 @@ trait Filterable
     }
 
     /**
-     * Process filters by replacing underscores with dots in the keys.
+     * Process filters by replacing double underscores with dots for relation filters.
      *
      * @param array $filters
      * @return array
@@ -39,7 +39,8 @@ trait Filterable
     {
         $processedFilters = [];
         foreach ($filters as $key => $value) {
-            $processedKey = str_replace('_', '.', $key);
+            // Replace double underscores with dots for relationships
+            $processedKey = str_replace('__', '.', $key);
             $processedFilters[$processedKey] = $value;
         }
         return $processedFilters;
@@ -69,7 +70,7 @@ trait Filterable
     }
 
     /**
-     * Check if the filter is for a relation.
+     * Check if the filter is for a relation (contains a dot from __).
      *
      * @param string $filter
      * @param array $relations
@@ -94,8 +95,8 @@ trait Filterable
             $query->where(function ($query) use ($filter, $value) {
                 foreach ($value as $key => $v) {
                     if($key == "equal"){
-                        $query->where($filter,  urldecode($v));
-                    }else{
+                        $query->where($filter, urldecode($v));
+                    } else {
                         $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
                     }
                 }
@@ -131,10 +132,16 @@ trait Filterable
             }]);
         }
     }
+
+    /**
+     * Exclude certain filters like 'page'.
+     *
+     * @param array $filters
+     * @return array
+     */
     private function withoutFilter($filters)
     {
         unset($filters['page']);
         return $filters;
     }
 }
-
