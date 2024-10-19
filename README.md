@@ -118,10 +118,10 @@ class Post extends Model
 Filter posts by users with multiple roles:
 
 ```bash
-GET /posts?user.role[]=admin&user.role[]=editor
+GET /posts?user---role['equal']=admin
 ```
 
-This request will filter posts authored by users who have either the "admin" or "editor" role.
+This request will filter posts authored by users who have either the "admin".
 
 ## License
 
