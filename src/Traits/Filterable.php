@@ -39,7 +39,7 @@ trait Filterable
     {
         $processedFilters = [];
         foreach ($filters as $key => $value) {
-            $processedKey = str_replace('#', '.', $key);
+            $processedKey = str_replace('---', '.', $key);
             $processedFilters[$processedKey] = $value;
         }
         return $processedFilters;
@@ -63,7 +63,7 @@ trait Filterable
     protected function getFilterableRelations(): array
     {
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
-            $explode = explode("#",$filter);
+            $explode = explode("---",$filter);
             return $explode[0];
         },array_keys($this->withoutFilter(Request::all())));
     }
