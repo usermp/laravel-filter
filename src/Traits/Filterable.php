@@ -39,8 +39,17 @@ trait Filterable
     {
         $processedFilters = [];
         foreach ($filters as $key => $value) {
-            $processedKey = str_replace('_', '.', $key);
-            $processedFilters[$processedKey] = $value;
+
+            $explode = explode("_",$key);
+
+            if(isset($explode[1]) && $explode[1] == "id"){
+
+                $processedKey = str_replace('_', '.', $key);
+                $processedFilters[$processedKey] = $value;
+
+            }
+            $processedFilters[$key] = $value;
+
         }
         return $processedFilters;
     }
