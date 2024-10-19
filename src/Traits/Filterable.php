@@ -14,7 +14,7 @@ trait Filterable
      */
     public function scopeFilter(Builder $query): Builder
     {
-        $filters = $this->processFilters($this->withoutFilter(request()->all()));
+        $filters = $this->processFilters($this->withoutFilter(Request::all()));
         $filterable = $this->getFilterableAttributes();
         $relations = $this->getFilterableRelations();
 
@@ -39,17 +39,8 @@ trait Filterable
     {
         $processedFilters = [];
         foreach ($filters as $key => $value) {
-
-            $explode = explode("_",$key);
-
-            if(isset($explode[1]) && $explode[1] == "id"){
-
-                $processedKey = str_replace('_', '.', $key);
-                $processedFilters[$processedKey] = $value;
-
-            }
-            $processedFilters[$key] = $value;
-
+            $processedKey = str_replace('#', '.', $key);
+            $processedFilters[$processedKey] = $value;
         }
         return $processedFilters;
     }
@@ -72,11 +63,8 @@ trait Filterable
     protected function getFilterableRelations(): array
     {
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
-            $explode = explode("_",$filter);
-
-            if(isset($explode[1]) && $explode[1] == "id") return $explode[0];
-
-            return $filter;
+            $explode = explode("#",$filter);
+            return $explode[0];
         },array_keys($this->withoutFilter(Request::all())));
     }
 
