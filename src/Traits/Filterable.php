@@ -116,20 +116,23 @@ trait Filterable
     protected function applyRelationFilter(Builder $query, string $filter, $value): void
     {
         [$relation, $relationFilter] = explode('.', $filter, 2);
-
-        if (is_array($value)) {
-            $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+    
+        $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+            if (is_array($value)) {
                 $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
-            })->with([$relation => function ($query) use ($relationFilter, $value) {
-                $query->whereIn($relationFilter, array_map('urldecode', $value));
-            }]);
-        } else {
-            $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+            } else {
                 $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
-            })->with([$relation => function ($query) use ($relationFilter, $value) {
-                $query->where($relationFilter, 'like', '%' . urldecode($value) . '%');
-            }]);
-        }
+            }
+        });
+    
+        // Eager load the related model with the filter applied
+        $query->with([$relation => function ($relationQuery) use ($relationFilter, $value) {
+            if (is_array($value)) {
+                $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
+            } else {
+                $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
+            }
+        }]);
     }
     private function withoutFilter($filters)
     {
