@@ -14,7 +14,7 @@ trait Filterable
      */
     public function scopeFilter(Builder $query): Builder
     {
-        $filters = $this->processFilters($this->withoutFilter(Request::all()));
+        $filters = $this->processFilters($this->withoutFilter(request()->all()));
         $filterable = $this->getFilterableAttributes();
         $relations = $this->getFilterableRelations();
 
