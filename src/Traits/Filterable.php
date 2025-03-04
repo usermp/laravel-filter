@@ -142,6 +142,10 @@ trait Filterable
     private function withoutFilter($filters)
     {
         unset($filters['page']);
+        unset($filters["_"]);
+        unset($filters["per_page"]);
+        
+
         return $filters;
     }
 }
