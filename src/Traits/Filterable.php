@@ -95,7 +95,12 @@ trait Filterable
                 foreach ($value as $key => $v) {
                     if($key == "equal"){
                         $query->where($filter,  urldecode($v));
-                    }else{
+                    }elseif ($key == "gte") {
+                        $query->where($filter, '>=', urldecode($v));
+                    } elseif ($key == "lte") {
+                        $query->where($filter, '<=', urldecode($v));
+                    }
+                    else{
                         $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
                     }
                 }
@@ -116,7 +121,7 @@ trait Filterable
     protected function applyRelationFilter(Builder $query, string $filter, $value): void
     {
         [$relation, $relationFilter] = explode('.', $filter, 2);
-
+    
         $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
             if (is_array($value)) {
                 $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
@@ -124,7 +129,7 @@ trait Filterable
                 $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
             }
         });
-
+    
         // Eager load the related model with the filter applied
         $query->with([$relation => function ($relationQuery) use ($relationFilter, $value) {
             if (is_array($value)) {
@@ -137,10 +142,6 @@ trait Filterable
     private function withoutFilter($filters)
     {
         unset($filters['page']);
-        unset($filters["_"]);
-        unset($filters["per_page"]);
-        
-
         return $filters;
     }
 }
