@@ -3,6 +3,7 @@ namespace Usermp\LaravelFilter\Traits;
 
 use Illuminate\Support\Facades\Request;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 
 trait Filterable
 {
@@ -16,7 +17,10 @@ trait Filterable
     {
         $filters = $this->processFilters($this->withoutFilter(Request::all()));
         $filterable = $this->getFilterableAttributes();
-        $relations = $this->getFilterableRelations();
+
+        $relations  = array_map(function($relation){
+            return $this->replaceRelation($relation);
+        },$this->getFilterableRelations());
 
         foreach ($filters as $filter => $value) {
             if ($this->isRelationFilter($filter, $relations)) {
@@ -39,11 +43,21 @@ trait Filterable
     {
         $processedFilters = [];
         foreach ($filters as $key => $value) {
-            $processedKey = str_replace('---', '.', $key);
+
+            $processedKey = $this->replaceRelation($key);
             $processedFilters[$processedKey] = $value;
+
         }
         return $processedFilters;
     }
+
+    public function replaceRelation($filter){
+        $processedKey = preg_replace('/---/', '.', $filter);
+        $processedKey = preg_replace('/--/', '.', $processedKey);
+        $processedKey = preg_replace('/__/', '_', $processedKey);
+        return $processedKey;
+    }
+
 
     /**
      * Get the filterable attributes.
@@ -63,7 +77,7 @@ trait Filterable
     protected function getFilterableRelations(): array
     {
         return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
-            $explode = explode("---",$filter);
+            $explode = explode(".",$filter);
             return $explode[0];
         },array_keys($this->withoutFilter(Request::all())));
     }
@@ -77,7 +91,8 @@ trait Filterable
      */
     protected function isRelationFilter(string $filter, array $relations): bool
     {
-        return strpos($filter, '.') !== false && in_array(explode('.', $filter)[0], $relations);
+
+        return strpos($filter, '.') !== false;
     }
 
     /**
@@ -120,31 +135,32 @@ trait Filterable
      */
     protected function applyRelationFilter(Builder $query, string $filter, $value): void
     {
-        [$relation, $relationFilter] = explode('.', $filter, 2);
-    
-        $query->whereHas($relation, function ($relationQuery) use ($relationFilter, $value) {
+        $relations = explode('.', $filter);
+        $lastAttribute = array_pop($relations);
+
+        $query->whereHas(implode('.', $relations), function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
-                $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
+                $relationQuery->whereIn($lastAttribute, array_map('urldecode', $value));
             } else {
-                $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
+                $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
             }
         });
-    
-        // Eager load the related model with the filter applied
-        $query->with([$relation => function ($relationQuery) use ($relationFilter, $value) {
+
+        $query->with([implode('.', $relations) => function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
-                $relationQuery->whereIn($relationFilter, array_map('urldecode', $value));
+                $relationQuery->whereIn($lastAttribute, array_map('urldecode', $value));
             } else {
-                $relationQuery->where($relationFilter, 'like', '%' . urldecode($value) . '%');
+                $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
             }
         }]);
     }
+
     private function withoutFilter($filters)
     {
         unset($filters['page']);
         unset($filters["_"]);
         unset($filters["per_page"]);
-        
+
 
         return $filters;
     }
