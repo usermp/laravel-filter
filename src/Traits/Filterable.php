@@ -108,7 +108,7 @@ trait Filterable
         if (is_array($value)) {
             $query->where(function ($query) use ($filter, $value) {
                 foreach ($value as $key => $v) {
-                    Log::info($v);
+                    $key = str_replace("'","",$key);
                     if ($key === "equal") {
                         $query->where($filter, urldecode($v));
                     } elseif ($key === "gte") {
@@ -125,7 +125,7 @@ trait Filterable
             $query->where($filter, 'like', '%' . urldecode($value) . '%');
         }
     }
-    
+
 
     /**
      * Apply a filter to a related model query.
@@ -140,7 +140,7 @@ trait Filterable
         $relations = explode('.', $filter);
         $lastAttribute = array_pop($relations);
         $relationPath = implode('.', $relations);
-    
+
         $query->whereHas($relationPath, function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
                 $relationQuery->where(function ($query) use ($lastAttribute, $value) {
@@ -161,11 +161,13 @@ trait Filterable
                 $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
             }
         });
-    
+
+
         $query->with([$relationPath => function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
                 $relationQuery->where(function ($query) use ($lastAttribute, $value) {
                     foreach ($value as $key => $v) {
+                        $key = str_replace("'","",$key);
                         if ($key == "equal") {
                             $query->where($lastAttribute, urldecode($v));
                         } elseif ($key == "gte") {
@@ -182,14 +184,13 @@ trait Filterable
             }
         }]);
     }
-    
+
 
     private function withoutFilter($filters)
     {
         unset($filters['page']);
         unset($filters["_"]);
         unset($filters["per_page"]);
-
 
         return $filters;
     }
