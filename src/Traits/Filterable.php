@@ -108,14 +108,15 @@ trait Filterable
         if (is_array($value)) {
             $query->where(function ($query) use ($filter, $value) {
                 foreach ($value as $key => $v) {
-                    if($key == "equal"){
-                        $query->where($filter,  urldecode($v));
-                    }elseif ($key == "gte") {
+                    Log::info($v);
+                    if ($key === "equal") {
+                        $query->where($filter, urldecode($v));
+                    } elseif ($key === "gte") {
+                        Log::info($v);
                         $query->where($filter, '>=', urldecode($v));
-                    } elseif ($key == "lte") {
+                    } elseif ($key === "lte") {
                         $query->where($filter, '<=', urldecode($v));
-                    }
-                    else{
+                    } else {
                         $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
                     }
                 }
@@ -124,6 +125,7 @@ trait Filterable
             $query->where($filter, 'like', '%' . urldecode($value) . '%');
         }
     }
+    
 
     /**
      * Apply a filter to a related model query.
@@ -137,23 +139,50 @@ trait Filterable
     {
         $relations = explode('.', $filter);
         $lastAttribute = array_pop($relations);
-
-        $query->whereHas(implode('.', $relations), function ($relationQuery) use ($lastAttribute, $value) {
+        $relationPath = implode('.', $relations);
+    
+        $query->whereHas($relationPath, function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
-                $relationQuery->whereIn($lastAttribute, array_map('urldecode', $value));
+                $relationQuery->where(function ($query) use ($lastAttribute, $value) {
+                    foreach ($value as $key => $v) {
+                        $key = str_replace("'","",$key);
+                        if ($key == "equal") {
+                            $query->where($lastAttribute, urldecode($v));
+                        } elseif ($key == "gte") {
+                            $query->where($lastAttribute, '>=', urldecode($v));
+                        } elseif ($key == "lte") {
+                            $query->where($lastAttribute, '<=', urldecode($v));
+                        } else {
+                            $query->orWhere($lastAttribute, 'like', '%' . urldecode($v) . '%');
+                        }
+                    }
+                });
             } else {
                 $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
             }
         });
-
-        $query->with([implode('.', $relations) => function ($relationQuery) use ($lastAttribute, $value) {
+    
+        $query->with([$relationPath => function ($relationQuery) use ($lastAttribute, $value) {
             if (is_array($value)) {
-                $relationQuery->whereIn($lastAttribute, array_map('urldecode', $value));
+                $relationQuery->where(function ($query) use ($lastAttribute, $value) {
+                    foreach ($value as $key => $v) {
+                        if ($key == "equal") {
+                            $query->where($lastAttribute, urldecode($v));
+                        } elseif ($key == "gte") {
+                            $query->where($lastAttribute, '>=', urldecode($v));
+                        } elseif ($key == "lte") {
+                            $query->where($lastAttribute, '<=', urldecode($v));
+                        } else {
+                            $query->orWhere($lastAttribute, 'like', '%' . urldecode($v) . '%');
+                        }
+                    }
+                });
             } else {
                 $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
             }
         }]);
     }
+    
 
     private function withoutFilter($filters)
     {
