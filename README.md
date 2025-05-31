@@ -12,7 +12,7 @@ The `Filterable` trait is designed to be used within Eloquent models in a Larave
 1. **Add the package to your project using Composer:**
 
 ```bash
-composer require usermp/laravel-filter
+composer require usermp/laravel-filter:dev-master
 ```
 
 2. **Add the `Filterable` trait to your Eloquent model:**
