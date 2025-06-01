@@ -1,197 +1,161 @@
 <?php
+
 namespace Usermp\LaravelFilter\Traits;
 
-use Illuminate\Support\Facades\Request;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 trait Filterable
 {
-    /**
-     * Apply filters to the query.
-     *
-     * @param Builder $query
-     * @return Builder
-     */
-    public function scopeFilter(Builder $query): Builder
+    protected string $filterRequestKey = 'filter';
+
+    public function scopeFilter(Builder $query, Request $request): Builder
     {
-        $filters = $this->processFilters($this->withoutFilter(Request::all()));
-        $filterable = $this->getFilterableAttributes();
+        $rawFilters = $request->input($this->getFilterRequestKey(), []);
 
-        $relations  = array_map(function($relation){
-            return $this->replaceRelation($relation);
-        },$this->getFilterableRelations());
+        if (!is_array($rawFilters) || empty($rawFilters)) {
+            return $query;
+        }
 
-        foreach ($filters as $filter => $value) {
-            if ($this->isRelationFilter($filter, $relations)) {
-                $this->applyRelationFilter($query, $filter, $value);
-            } elseif (in_array($filter, $filterable)) {
-                $this->applyFilter($query, $filter, $value);
+        $processedFilters = $rawFilters;
+
+        $allowedAttributes = $this->getFilterableAttributes();
+        $allowedRelationBaseNames = $this->getFilterableRelations();
+
+        foreach ($processedFilters as $filterKey => $value) {
+            if (!isset($value) || ($value === '' && $value !== '0' && $value !== 0)) {
+                continue;
+            }
+
+            $isRelation = false;
+            $baseRelationName = null;
+
+            if (strpos($filterKey, '.') !== false) {
+                $baseRelationName = explode('.', $filterKey, 2)[0];
+                if (in_array($baseRelationName, $allowedRelationBaseNames)) {
+                    $isRelation = true;
+                }
+            }
+
+            if ($isRelation) {
+                $this->applyRelationFilter($query, $filterKey, $value);
+            } elseif (in_array($filterKey, $allowedAttributes)) {
+                $this->applyDirectFilter($query, $filterKey, $value);
             }
         }
 
         return $query;
     }
 
-    /**
-     * Process filters by replacing underscores with dots in the keys.
-     *
-     * @param array $filters
-     * @return array
-     */
-    protected function processFilters(array $filters): array
+    protected function getFilterRequestKey(): string
     {
-        $processedFilters = [];
-        foreach ($filters as $key => $value) {
-
-            $processedKey = $this->replaceRelation($key);
-            $processedFilters[$processedKey] = $value;
-
-        }
-        return $processedFilters;
+        return property_exists($this, 'filterRequestKeyOverride') ? $this->filterRequestKeyOverride : $this->filterRequestKey;
     }
 
-    public function replaceRelation($filter){
-        $processedKey = preg_replace('/---/', '.', $filter);
-        $processedKey = preg_replace('/--/', '.', $processedKey);
-        $processedKey = preg_replace('/__/', '_', $processedKey);
-        return $processedKey;
-    }
-
-
-    /**
-     * Get the filterable attributes.
-     *
-     * @return array
-     */
     protected function getFilterableAttributes(): array
     {
-        return property_exists($this, 'filterable') ? $this->filterable : array_keys($this->withoutFilter(Request::all()));
+        if (!property_exists($this, 'filterable') || !is_array($this->filterable)) {
+            return [];
+        }
+        return $this->filterable;
     }
 
-    /**
-     * Get the filterable relations.
-     *
-     * @return array
-     */
     protected function getFilterableRelations(): array
     {
-        return property_exists($this, 'filterableRelations') ? $this->filterableRelations : array_map(function($filter){
-            $explode = explode(".",$filter);
-            return $explode[0];
-        },array_keys($this->withoutFilter(Request::all())));
+        if (!property_exists($this, 'filterableRelations') || !is_array($this->filterableRelations)) {
+            return [];
+        }
+        return $this->filterableRelations;
     }
 
-    /**
-     * Check if the filter is for a relation.
-     *
-     * @param string $filter
-     * @param array $relations
-     * @return bool
-     */
-    protected function isRelationFilter(string $filter, array $relations): bool
+    protected function applyDirectFilter(Builder $query, string $filterAttribute, $value): void
     {
-
-        return strpos($filter, '.') !== false;
+        $this->applyWhereConditions($query, $filterAttribute, $value);
     }
 
-    /**
-     * Apply a single filter to the query.
-     *
-     * @param Builder $query
-     * @param string $filter
-     * @param mixed $value
-     * @return void
-     */
-    protected function applyFilter(Builder $query, string $filter, $value): void
+    protected function applyRelationFilter(Builder $query, string $relationFilterKey, $value): void
+    {
+        $parts = explode('.', $relationFilterKey);
+        $attributeName = array_pop($parts);
+        $relationPath = implode('.', $parts);
+
+        $filterLogic = function (Builder $relationQuery) use ($attributeName, $value) {
+            $this->applyWhereConditions($relationQuery, $attributeName, $value);
+        };
+
+        $query->whereHas($relationPath, $filterLogic);
+        $query->with([$relationPath => $filterLogic]);
+    }
+
+    protected function applyWhereConditions(Builder $query, string $field, $value): void
     {
         if (is_array($value)) {
-            $query->where(function ($query) use ($filter, $value) {
-                foreach ($value as $key => $v) {
-                    $key = str_replace("'","",$key);
-                    if ($key === "equal") {
-                        $query->where($filter, urldecode($v));
-                    } elseif ($key === "gte") {
-                        Log::info($v);
-                        $query->where($filter, '>=', urldecode($v));
-                    } elseif ($key === "lte") {
-                        $query->where($filter, '<=', urldecode($v));
-                    } else {
-                        $query->orWhere($filter, 'like', '%' . urldecode($v) . '%');
+            $query->where(function (Builder $subQuery) use ($field, $value) {
+                foreach ($value as $operator => $operand) {
+                    $operand = urldecode($operand);
+                    switch (strtolower(trim($operator))) {
+                        case 'equal': case '=':
+                            $subQuery->where($field, '=', $operand);
+                            break;
+                        case 'notequal': case '!=': case '<>':
+                            $subQuery->where($field, '!=', $operand);
+                            break;
+                        case 'gt': case '>':
+                            $subQuery->where($field, '>', $operand);
+                            break;
+                        case 'gte': case '>=':
+                            $subQuery->where($field, '>=', $operand);
+                            break;
+                        case 'lt': case '<':
+                            $subQuery->where($field, '<', $operand);
+                            break;
+                        case 'lte': case '<=':
+                            $subQuery->where($field, '<=', $operand);
+                            break;
+                        case 'like':
+                            $subQuery->where($field, 'like', '%' . $operand . '%');
+                            break;
+                        case 'notlike':
+                             $subQuery->where($field, 'not like', '%' . $operand . '%');
+                             break;
+                        case 'startswith':
+                            $subQuery->where($field, 'like', $operand . '%');
+                            break;
+                        case 'endswith':
+                            $subQuery->where($field, 'like', '%' . $operand);
+                            break;
+                        case 'in':
+                            $actualValues = is_array($operand) ? $operand : explode(',', $operand);
+                            $subQuery->whereIn($field, array_map('urldecode', $actualValues));
+                            break;
+                        case 'notin':
+                            $actualValues = is_array($operand) ? $operand : explode(',', $operand);
+                            $subQuery->whereNotIn($field, array_map('urldecode', $actualValues));
+                            break;
+                        case 'between':
+                            if (is_array($operand) && count($operand) == 2) {
+                                $subQuery->whereBetween($field, [urldecode($operand[0]), urldecode($operand[1])]);
+                            }
+                            break;
+                        case 'notbetween':
+                             if (is_array($operand) && count($operand) == 2) {
+                                 $subQuery->whereNotBetween($field, [urldecode($operand[0]), urldecode($operand[1])]);
+                             }
+                             break;
+                        case 'null':
+                            $subQuery->whereNull($field);
+                            break;
+                        case 'notnull':
+                            $subQuery->whereNotNull($field);
+                            break;
+                        default:
+                            break;
                     }
                 }
             });
         } else {
-            $query->where($filter, 'like', '%' . urldecode($value) . '%');
+            $query->where($field, 'like', '%' . urldecode($value) . '%');
         }
-    }
-
-
-    /**
-     * Apply a filter to a related model query.
-     *
-     * @param Builder $query
-     * @param string $filter
-     * @param mixed $value
-     * @return void
-     */
-    protected function applyRelationFilter(Builder $query, string $filter, $value): void
-    {
-        $relations = explode('.', $filter);
-        $lastAttribute = array_pop($relations);
-        $relationPath = implode('.', $relations);
-
-        $query->whereHas($relationPath, function ($relationQuery) use ($lastAttribute, $value) {
-            if (is_array($value)) {
-                $relationQuery->where(function ($query) use ($lastAttribute, $value) {
-                    foreach ($value as $key => $v) {
-                        $key = str_replace("'","",$key);
-                        if ($key == "equal") {
-                            $query->where($lastAttribute, urldecode($v));
-                        } elseif ($key == "gte") {
-                            $query->where($lastAttribute, '>=', urldecode($v));
-                        } elseif ($key == "lte") {
-                            $query->where($lastAttribute, '<=', urldecode($v));
-                        } else {
-                            $query->orWhere($lastAttribute, 'like', '%' . urldecode($v) . '%');
-                        }
-                    }
-                });
-            } else {
-                $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
-            }
-        });
-
-
-        $query->with([$relationPath => function ($relationQuery) use ($lastAttribute, $value) {
-            if (is_array($value)) {
-                $relationQuery->where(function ($query) use ($lastAttribute, $value) {
-                    foreach ($value as $key => $v) {
-                        $key = str_replace("'","",$key);
-                        if ($key == "equal") {
-                            $query->where($lastAttribute, urldecode($v));
-                        } elseif ($key == "gte") {
-                            $query->where($lastAttribute, '>=', urldecode($v));
-                        } elseif ($key == "lte") {
-                            $query->where($lastAttribute, '<=', urldecode($v));
-                        } else {
-                            $query->orWhere($lastAttribute, 'like', '%' . urldecode($v) . '%');
-                        }
-                    }
-                });
-            } else {
-                $relationQuery->where($lastAttribute, 'like', '%' . urldecode($value) . '%');
-            }
-        }]);
-    }
-
-
-    private function withoutFilter($filters)
-    {
-        unset($filters['page']);
-        unset($filters["_"]);
-        unset($filters["per_page"]);
-
-        return $filters;
     }
 }
